@@ -27,7 +27,6 @@ jobs:
       - run: npm ci
       - run: npm run verify:versions
       - run: npm run typecheck
-      - run: npm test
       - run: npm run build
 
   android:

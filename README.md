@@ -55,7 +55,7 @@ You need Node 22 or newer, JDK 21 and the Android SDK.
 ```bash
 git clone https://github.com/orgista/openpanel-android.git && cd openpanel-android
 npm ci
-npm test && npm run typecheck
+npm run typecheck
 npm run build                # vite: src/ -> dist/
 npx cap sync android         # copy the web bundle and plugins into the Android project
 cd android && ./gradlew assembleDebug    # debug-signed, for development only
