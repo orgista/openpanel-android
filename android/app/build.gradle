@@ -94,20 +94,20 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okio:okio:3.9.0'
+    implementation 'com.squareup.okio:okio:3.18.2'
     implementation project(':capacitor-android')
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
-    implementation 'androidx.fragment:fragment-ktx:1.8.9'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'androidx.fragment:fragment-ktx:1.9.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
     implementation 'androidx.media3:media3-common-ktx:1.10.0'
     implementation 'androidx.media3:media3-session:1.10.0'
     implementation 'androidx.media3:media3-exoplayer:1.10.0'
-    implementation 'org.readium.kotlin-toolkit:readium-shared:3.3.0'
-    implementation 'org.readium.kotlin-toolkit:readium-streamer:3.3.0'
-    implementation 'org.readium.kotlin-toolkit:readium-navigator:3.3.0'
-    implementation 'org.readium.kotlin-toolkit:readium-navigator-media-audio:3.3.0'
-    implementation 'org.readium.kotlin-toolkit:readium-adapter-exoplayer:3.3.0'
-    implementation 'org.readium.kotlin-toolkit:readium-adapter-pdfium:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-shared:3.4.0'
+    implementation 'org.readium.kotlin-toolkit:readium-streamer:3.4.0'
+    implementation 'org.readium.kotlin-toolkit:readium-navigator:3.4.0'
+    implementation 'org.readium.kotlin-toolkit:readium-navigator-media-audio:3.4.0'
+    implementation 'org.readium.kotlin-toolkit:readium-adapter-exoplayer:3.4.0'
+    implementation 'org.readium.kotlin-toolkit:readium-adapter-pdfium:3.4.0'
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
