@@ -1,0 +1,150 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def openPanelSigningValue = { String name ->
+    def value = project.findProperty(name)
+    if (value != null && value.toString().trim()) {
+        return value.toString()
+    }
+    value = System.getenv(name)
+    return value != null && value.trim() ? value : null
+}
+
+def openPanelReleaseStoreFile = openPanelSigningValue("OPENPANEL_KEYSTORE_FILE") ?: openPanelSigningValue("OPENPANEL_STORE_FILE")
+def openPanelReleaseStorePassword = openPanelSigningValue("OPENPANEL_KEYSTORE_PASS")
+def openPanelReleaseKeyAlias = openPanelSigningValue("OPENPANEL_KEY_ALIAS")
+def openPanelReleaseKeyPassword = openPanelSigningValue("OPENPANEL_KEY_PASS")
+def openPanelReleaseSigningReady = openPanelReleaseStoreFile &&
+        openPanelReleaseStorePassword &&
+        openPanelReleaseKeyAlias &&
+        openPanelReleaseKeyPassword
+
+android {
+    namespace = "com.orgista.openpanel"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.orgista.openpanel"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 114
+        versionName "1.1.105"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [openPanelAppLabel: "OpenPanel"]
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+        coreLibraryDesugaringEnabled true
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+        freeCompilerArgs += ['-Xannotation-default-target=param-property']
+    }
+    buildFeatures {
+        // Generate BuildConfig so native code can read VERSION_NAME/APPLICATION_ID
+        // instead of hardcoding them (AGP 8 disables this feature by default).
+        buildConfig true
+    }
+    packagingOptions {
+        resources.excludes += ['META-INF/LICENSE.md', 'META-INF/LICENSE-notice.md']
+    }
+    signingConfigs {
+        release {
+            if (openPanelReleaseSigningReady) {
+                storeFile file(openPanelReleaseStoreFile)
+                storePassword openPanelReleaseStorePassword
+                keyAlias openPanelReleaseKeyAlias
+                keyPassword openPanelReleaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            // Install beside the ArborXR production package during USB testing.
+            // This preserves the production signature, data, and launcher state.
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+            manifestPlaceholders.openPanelAppLabel = "OpenPanel Debug"
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (openPanelReleaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okio:okio:3.9.0'
+    implementation project(':capacitor-android')
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation 'androidx.fragment:fragment-ktx:1.8.9'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
+    implementation 'androidx.media3:media3-common-ktx:1.10.0'
+    implementation 'androidx.media3:media3-session:1.10.0'
+    implementation 'androidx.media3:media3-exoplayer:1.10.0'
+    implementation 'org.readium.kotlin-toolkit:readium-shared:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-streamer:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-navigator:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-navigator-media-audio:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-adapter-exoplayer:3.3.0'
+    implementation 'org.readium.kotlin-toolkit:readium-adapter-pdfium:3.3.0'
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+tasks.register("verifyOpenPanelReleaseSigning") {
+    group = "verification"
+    description = "Fails release builds unless OpenPanel release signing inputs are present and the keystore file exists."
+    doLast {
+        def missing = []
+        if (!openPanelReleaseStoreFile) missing << "OPENPANEL_KEYSTORE_FILE"
+        if (!openPanelReleaseStorePassword) missing << "OPENPANEL_KEYSTORE_PASS"
+        if (!openPanelReleaseKeyAlias) missing << "OPENPANEL_KEY_ALIAS"
+        if (!openPanelReleaseKeyPassword) missing << "OPENPANEL_KEY_PASS"
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing OpenPanel release signing inputs: ${missing.join(', ')}. Keep values in CI/secret manager; do not commit them.")
+        }
+        if (!file(openPanelReleaseStoreFile).isFile()) {
+            throw new GradleException("OpenPanel release keystore file was not found at OPENPANEL_KEYSTORE_FILE.")
+        }
+    }
+}
+
+tasks.matching { task ->
+    task.name in ["assembleRelease", "bundleRelease", "packageRelease", "signReleaseBundle"]
+}.configureEach {
+    dependsOn tasks.named("verifyOpenPanelReleaseSigning")
+}

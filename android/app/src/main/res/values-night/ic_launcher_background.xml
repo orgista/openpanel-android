@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode adaptive-icon background; pairs with
+         drawable-night/ic_launcher_foreground_vector.xml. -->
+    <color name="ic_launcher_background">#1E293B</color>
+</resources>
+
