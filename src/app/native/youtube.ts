@@ -55,8 +55,12 @@ export function embedUrl(videoId: string): string {
   );
 }
 
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/** Thumbnail for a YouTube id; empty for anything that is not a plain 11-character id. */
 export function thumbnailUrl(videoId: string): string {
-  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  if (!VIDEO_ID.test(videoId)) return "";
+  return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
 
 export function getVideos(): KioskVideo[] {

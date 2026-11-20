@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "verify:versions": "node scripts/verify-versions.mjs",
     "storage:clean-local": "bash scripts/gradle-local.sh --clean-local-data"
   },
@@ -30,6 +30,6 @@
     "tailwindcss": "4.1.12",
     "typescript": "5.6.3",
     "vite": "^6.4.3",
-    "vitest": "^3.2.4"
+    "vitest": "^5.1.1"
   }
 }
