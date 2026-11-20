@@ -5,12 +5,45 @@ export interface InstalledApp {
   label: string;
   isSystem: boolean;
   installer: string | null;
-  icon: string | null; // base64 PNG
+  lockTaskPermitted: boolean;
+  icon: string | null; // base64 PNG, densest variant available, max 256px
+  /**
+   * base64 WebP of the app's Leanback TV banner (320x180dp) when it ships one —
+   * the same wide art the stock Google TV launcher shows. null for the many
+   * packages that have no banner, in which case fall back to `icon`.
+   */
+  banner?: string | null;
+  /**
+   * The two layers of an adaptive launcher icon, each the full 108dp layer
+   * (bleed included) at 432x432. Foreground is base64 PNG; background is base64
+   * WebP, or PNG when it has transparency. null for apps with a legacy icon.
+   */
+  iconForeground?: string | null;
+  iconBackground?: string | null;
 }
 
 export interface BatteryInfo {
   level: number; // 0-100, -1 if unknown
   isCharging: boolean;
+}
+
+// Fully-style kiosk grants. deviceOwner/deviceAdmin/defaultLauncher and the two
+// runtime perms (location, bluetooth) can be held or auto-granted; the rest are
+// "special app access" the operator toggles in Settings via a deep link.
+export interface PermissionStatus {
+  deviceOwner: boolean;
+  deviceAdmin: boolean;
+  defaultLauncher: boolean;
+  homeControlMode: "native" | "fire-redirect" | "fire-needs-accessibility" | "other";
+  location: boolean;
+  bluetooth: boolean;
+  accessibility: boolean;
+  notificationAccess: boolean;
+  overlay: boolean;
+  usageAccess: boolean;
+  writeSettings: boolean;
+  batteryUnrestricted: boolean;
+  keyguardDisabled: boolean;
 }
 
 export interface WifiStatus {
@@ -21,6 +54,7 @@ export interface WifiStatus {
 }
 
 export interface WifiNetwork {
+  canForget?: boolean;
   ssid: string;
   signal: number; // 0-100
   secured: boolean;
@@ -33,12 +67,21 @@ export interface BtDevice {
   paired: boolean;
   connected: boolean;
   unnamed?: boolean;
+  /** Headphones, speakers or a controller; only set on devices found by a scan. */
+  listenOrPlay?: boolean;
 }
 
 export interface BluetoothStatus {
   available: boolean;
   enabled: boolean;
+  permissionGranted?: boolean;
   devices?: BtDevice[];
+}
+
+export interface NotificationSoundState {
+  sounds: { id: string; title: string }[];
+  selected: string | null;
+  canWrite: boolean;
 }
 
 export interface KioskStatus {
@@ -46,15 +89,179 @@ export interface KioskStatus {
   deviceAdmin: boolean; // OpenPanel device-admin enabled
   arborXrManaged: boolean; // ArborXR (app.xrdm.client) is the Device Owner
   defaultLauncher: boolean; // OpenPanel is the HOME launcher
+  homeControlMode: "native" | "fire-redirect" | "fire-needs-accessibility" | "other";
   lockTaskActive: boolean;
   lockTaskMode: "locked" | "pinned" | "none";
+  managementMode: "companion" | "standalone";
+  kioskEnabled: boolean;
+  systemUpdateWaitingSince?: number | null; // Device Owner only: when Android found an update it has not installed yet
+}
+
+export interface YouTubeChannelResult {
+  kind: "channel";
+  sourceId: string;
+  sourceUrl: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string | null;
+}
+
+export interface YouTubeChannelVideoResult {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  publishedAt: string;
+  duration?: number;
+  isShort?: boolean;
+}
+
+export interface DeviceProfile {
+  sdk?: number;
+  deviceType: "television" | "tablet" | "handheld";
+  isTelevision: boolean;
+  isTablet: boolean;
+  isHandheld: boolean;
+  isFireOs?: boolean;
+  hasLeanback: boolean;
+  hasTouchscreen: boolean;
+  hasDpad: boolean;
+  hasHardwareKeyboard: boolean;
+  smallestScreenWidthDp: number;
+  hasBattery: boolean;
+  remoteUi: boolean;
+  touchUi: boolean;
+  // Debug APK (com.orgista.openpanel.debug), installed beside the managed app for testing.
+  debugBuild?: boolean;
+  showBattery: boolean;
+  supportsLeanbackApps: boolean;
+  voiceInputAvailable: boolean;
+  controllerName: string | null;
+}
+
+export interface DeviceHealthSnapshot {
+  manufacturer: string;
+  brand: string;
+  model: string;
+  device: string;
+  product: string;
+  androidVersion: string;
+  sdk: number;
+  profile: string;
+  ramTotalBytes: number;
+  ramAvailableBytes: number;
+  ramUsedBytes: number;
+  ramUsedPercent: number;
+  storageTotalBytes: number;
+  storageAvailableBytes: number;
+  storageUsedBytes: number;
+  storageUsedPercent: number;
+  deviceOwner: boolean;
+  arborXrManaged: boolean;
+  canManageApps: boolean;
+  canManageNotifications: boolean;
+  manageNotifications: boolean;
+  installedBloatCount: number;
+  activeBloatCount: number;
+  hiddenBloatCount: number;
+  notificationManagedCount: number;
+}
+
+export interface DebloatApp {
+  packageName: string;
+  label: string;
+  installedLabel: string;
+  category: string;
+  reason: string;
+  profile: string;
+  isSystem: boolean;
+  enabled: boolean;
+  hidden: boolean;
+  managedByOpenPanel: boolean;
+  canUninstall: boolean;
+  status: "active" | "hidden" | "disabled-externally";
+}
+
+export interface DeviceHealthActionResult {
+  available: boolean;
+  deviceOwner: boolean;
+  arborXrManaged: boolean;
+  message: string;
+  changed?: number;
+  restored?: number;
+  remaining?: number;
+  apps?: DebloatApp[];
+  app?: DebloatApp | null;
+  notifications?: DeviceHealthActionResult;
+  enabled?: boolean;
+}
+
+export interface DnsFilterStatus {
+  filterPackage: "dnsfilter.android";
+  versionName: string | null;
+  installed: boolean;
+  enabled: boolean;
+  vpnActive: boolean;
+  filterActive: boolean;
+  alwaysOn: boolean;
+  alwaysOnKnown?: boolean;
+  lockdown: boolean;
+  privateDnsMode: "off" | "opportunistic" | "hostname" | "unknown";
+  privateDnsHost: string | null;
+  privateDnsMayBypassFilter: boolean;
+  canManageAlwaysOn: boolean;
+  arborXrManaged: boolean;
 }
 
 interface SystemBridgePlugin {
-  getInstalledApps(): Promise<{ apps: InstalledApp[] }>;
+  readManagedSettings(): Promise<{ contents: string | null; source?: string; error?: string }>;
+  openManagedLink(opts: { url: string }): Promise<void>;
+  getLocalLinks(): Promise<{ links: { title: string; url: string }[] }>;
+  setLocalLinks(opts: { links: { title: string; url: string }[]; adminToken?: string }): Promise<{ links: { title: string; url: string }[] }>;
+  writeDiagnostic(opts: { level: "info" | "warning" | "error"; message: string }): Promise<void>;
+  hideKeyboard(): Promise<void>;
+  showKeyboard(): Promise<void>;
+  setKeepScreenOn(opts: { enabled: boolean }): Promise<void>;
+  setLegacyTvCompatRendering(opts: { enabled: boolean }): Promise<{
+    applied: boolean;
+    enabled: boolean;
+  }>;
+  getDeviceProfile(): Promise<DeviceProfile>;
+  requestVoiceInput(opts?: { prompt?: string }): Promise<{ text: string }>;
+  resolveYouTubeChannel(opts: { input: string }): Promise<{ channel: YouTubeChannelResult }>;
+  /** Fetch a trusted YouTube image via the native HTTP stack (IPv4-first DNS) as a data URL. */
+  fetchImageAsDataUrl(opts: { url: string }): Promise<{ dataUrl: string }>;
+  getYouTubeChannelVideos(opts: { channelId: string; pageToken?: string }): Promise<{
+    channelTitle: string;
+    videos: YouTubeChannelVideoResult[];
+    nextPageToken: string | null;
+    hasMore: boolean;
+    catalogComplete: boolean;
+    catalogSource: "channel-page" | "recent-feed";
+  }>;
+  getInstalledApps(opts?: { includeIconLayers?: boolean }): Promise<{ apps: InstalledApp[] }>;
+  getDeviceHealth(): Promise<DeviceHealthSnapshot>;
+  getDnsFilterStatus(): Promise<DnsFilterStatus>;
+  setDnsFilterAlwaysOn(opts: { enabled: boolean; adminToken?: string }): Promise<DnsFilterStatus>;
+  openDnsFilter(): Promise<void>;
+  openVpnSettings(): Promise<void>;
+  openPrivateDnsSettings(): Promise<void>;
+  getDebloatApps(): Promise<{ profile: string; apps: DebloatApp[] }>;
+  applyRecommendedDebloat(opts: { manageNotifications: boolean; adminToken?: string }): Promise<DeviceHealthActionResult>;
+  setDebloatPackageState(opts: { packageName: string; hidden: boolean; adminToken?: string }): Promise<DeviceHealthActionResult>;
+  restoreDebloatApps(opts?: { adminToken?: string }): Promise<DeviceHealthActionResult>;
+  setNotificationManagement(opts: { enabled: boolean; adminToken?: string }): Promise<DeviceHealthActionResult>;
+  requestUninstallPackage(opts: { packageName: string }): Promise<{
+    packageName: string;
+    uninstalled: boolean;
+    resultCode: number;
+  }>;
   launchApp(opts: { packageName: string }): Promise<void>;
   getBatteryInfo(): Promise<BatteryInfo>;
   getWifiStatus(): Promise<WifiStatus>;
+  getUsageClock(): Promise<{ wall: number; monotonic: number; foregroundSince: number; boot: number; interactive: boolean; locked: boolean;
+    awayMs?: number; awaySession?: number }>;
+  /** Budget (ms of screen time outside OpenPanel) and wall time of the next downtime; -1 = none. */
+  setTimeGuard(opts: { budgetMs: number; downtimeAt: number }): Promise<void>;
   scanWifi(): Promise<{ networks: WifiNetwork[] }>;
   connectWifi(opts: { ssid: string; password?: string }): Promise<{ status: string; code: number }>;
   forgetWifi(opts: { ssid: string }): Promise<void>;
@@ -65,15 +272,55 @@ interface SystemBridgePlugin {
   pairBluetooth(opts: { address: string }): Promise<{ status: string }>;
   unpairBluetooth(opts: { address: string }): Promise<{ status: string }>;
   openBluetoothSettings(): Promise<void>;
+  openSystemSettings(): Promise<void>;
   // Standalone (non-ArborXR) kiosk lockdown:
   getKioskStatus(): Promise<KioskStatus>;
+  // Mirrors the web layer's admin PIN verifier into native prefs so the
+  // kiosk-dismantling methods below can gate on it (adminToken). See
+  // SystemBridgePlugin.requireKioskAdmin() / src/app/native/adminAuth.ts.
+  // Empty/omitted verifier clears native gating back to "unprovisioned".
+  setKioskAdminVerifier(opts: { verifier: string }): Promise<void>;
+  setManagementMode(opts: { mode: "companion" | "standalone"; adminToken?: string }): Promise<{ mode: string }>;
   requestDeviceAdmin(): Promise<{ status?: string }>;
-  openLauncherSettings(): Promise<void>;
-  enableKioskLock(opts?: { packages?: string[] }): Promise<{ status: string }>;
-  disableKioskLock(): Promise<void>;
+  openLauncherSettings(opts?: { adminToken?: string }): Promise<void>;
+  enableKioskLock(opts?: { packages?: string[]; adminToken?: string }): Promise<{ status: string }>;
+  disableKioskLock(opts?: { adminToken?: string }): Promise<void>;
+  exitKioskToSystemHome(opts?: { adminToken?: string }): Promise<{
+    exited: boolean;
+    launcherPackage?: string | null;
+    deviceOwnerRetained?: boolean;
+    // Present when exited is false: the device has no other launcher that
+    // would take over Home, so OpenPanel intentionally stayed put instead of
+    // stranding the screen. See SystemBridgePlugin.exitKioskToSystemHome().
+    reason?: "NO_SAFE_LAUNCHER";
+    message?: string;
+    recoveryCommand?: string;
+  }>;
+  clearDeviceOwner(opts?: { adminToken?: string }): Promise<{ cleared: boolean }>;
+  // Fully-style permissions & special app access:
+  getPermissionStatus(): Promise<PermissionStatus>;
+  autoGrantSelfPermissions(): Promise<{ deviceOwner: boolean; granted: number }>;
+  setKeyguardDisabled(opts: { disabled: boolean; adminToken?: string }): Promise<{ disabled: boolean; applied: boolean }>;
+  openAccessibilitySettings(): Promise<void>;
+  openNotificationListenerSettings(): Promise<void>;
+  openOverlaySettings(): Promise<void>;
+  openUsageAccessSettings(): Promise<void>;
+  openWriteSettings(): Promise<void>;
+  requestIgnoreBatteryOptimizations(): Promise<{ granted?: boolean }>;
+  getVolumeLimit(): Promise<{ enabled: boolean; percent: number }>;
+  setVolumeLimit(opts: { enabled?: boolean; percent?: number }): Promise<{ enabled: boolean; percent: number }>;
+  testVolumeLimit(): Promise<void>;
+  getNotificationSounds(): Promise<NotificationSoundState>;
+  previewNotificationSound(opts: { id: string }): Promise<void>;
+  setNotificationSound(opts: { id: string }): Promise<void>;
+  addListener(event: "foreground" | "screenOff" | "volumeHint", cb: () => void): Promise<PluginListenerHandle>;
   addListener(
     event: "bluetoothStateChanged",
     cb: (data: { enabled: boolean }) => void
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    event: "batteryChanged",
+    cb: (data: BatteryInfo) => void
   ): Promise<PluginListenerHandle>;
 }
 
@@ -81,15 +328,229 @@ const native = registerPlugin<SystemBridgePlugin>("SystemBridge");
 
 export const isNative = Capacitor.isNativePlatform();
 
+let webManageNotifications = true;
+let webDnsFilterAlwaysOn = true;
+let webDebloatApps: DebloatApp[] = [
+  {
+    packageName: "com.google.android.youtube",
+    label: "YouTube",
+    installedLabel: "YouTube",
+    category: "media",
+    reason: "OpenPanel provides its own restricted YouTube player",
+    profile: "generic",
+    isSystem: true,
+    enabled: true,
+    hidden: false,
+    managedByOpenPanel: false,
+    canUninstall: false,
+    status: "active",
+  },
+  {
+    packageName: "com.lenovo.hec.lenovoextend",
+    label: "Lenovo FreeStyle",
+    installedLabel: "Lenovo FreeStyle",
+    category: "oem",
+    reason: "Optional cross-device companion",
+    profile: "lenovo",
+    isSystem: true,
+    enabled: true,
+    hidden: false,
+    managedByOpenPanel: false,
+    canUninstall: false,
+    status: "active",
+  },
+  {
+    packageName: "com.google.android.keep",
+    label: "Google Keep",
+    installedLabel: "Keep Notes",
+    category: "productivity",
+    reason: "Optional personal notes app",
+    profile: "generic",
+    isSystem: false,
+    enabled: true,
+    hidden: false,
+    managedByOpenPanel: false,
+    canUninstall: true,
+    status: "active",
+  },
+];
+
+const webHealthSnapshot = (): DeviceHealthSnapshot => {
+  const hidden = webDebloatApps.filter((app) => app.hidden).length;
+  const active = webDebloatApps.filter((app) => app.status === "active").length;
+  return {
+    manufacturer: "Lenovo",
+    brand: "Lenovo",
+    model: "Tab M10 Plus",
+    device: "TB132FU",
+    product: "TB132FU",
+    androidVersion: "14",
+    sdk: 34,
+    profile: "lenovo",
+    ramTotalBytes: 6_442_450_944,
+    ramAvailableBytes: 3_221_225_472,
+    ramUsedBytes: 3_221_225_472,
+    ramUsedPercent: 50,
+    storageTotalBytes: 128_000_000_000,
+    storageAvailableBytes: 82_000_000_000,
+    storageUsedBytes: 46_000_000_000,
+    storageUsedPercent: 36,
+    deviceOwner: true,
+    arborXrManaged: false,
+    canManageApps: true,
+    canManageNotifications: true,
+    manageNotifications: webManageNotifications,
+    installedBloatCount: webDebloatApps.length,
+    activeBloatCount: active,
+    hiddenBloatCount: hidden,
+    notificationManagedCount: webManageNotifications ? 12 : 0,
+  };
+};
+
+const webActionResult = (message: string, changed = 0): DeviceHealthActionResult => ({
+  available: true,
+  deviceOwner: true,
+  arborXrManaged: false,
+  message,
+  changed,
+  apps: webDebloatApps,
+});
+
 // Browser fallback so the UI stays usable during web development.
 const webMock: SystemBridgePlugin = {
-  async getInstalledApps() {
+  async readManagedSettings() { return { contents: null }; },
+  async openManagedLink() { throw new Error("Managed link viewer requires Android"); },
+  async getLocalLinks() { return { links: [] }; },
+  async setLocalLinks({ links }) { return { links }; },
+  async writeDiagnostic() {},
+  async hideKeyboard() {},
+  async showKeyboard() {},
+  async setKeepScreenOn() {},
+  async setLegacyTvCompatRendering({ enabled }) {
+    return { applied: false, enabled };
+  },
+  async getDeviceProfile() {
     return {
-      apps: [
-        { packageName: "com.example.one", label: "Sample Game", isSystem: false, installer: "app.xrdm.client", icon: null },
-        { packageName: "com.example.two", label: "Another Game", isSystem: false, installer: "app.xrdm.client", icon: null },
-      ],
+      sdk: 34,
+      deviceType: "television",
+      isTelevision: true,
+      isTablet: false,
+      isHandheld: false,
+      isFireOs: false,
+      hasLeanback: true,
+      hasTouchscreen: false,
+      hasDpad: true,
+      hasHardwareKeyboard: false,
+      smallestScreenWidthDp: 960,
+      hasBattery: false,
+      remoteUi: true,
+      touchUi: false,
+      showBattery: false,
+      supportsLeanbackApps: true,
+      voiceInputAvailable: true,
+      controllerName: "Google TV Remote (browser preview)",
     };
+  },
+  async requestVoiceInput() {
+    return { text: "" };
+  },
+  async resolveYouTubeChannel() {
+    throw new Error("YouTube channel lookup is available in the installed Android app.");
+  },
+  async fetchImageAsDataUrl({ url }: { url: string }) {
+    // Browser dev fallback: fetch directly and inline the result.
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) throw new Error(`Image fetch failed: HTTP ${response.status}`);
+    const blob = await response.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Image could not be encoded."));
+      reader.readAsDataURL(blob);
+    });
+    return { dataUrl };
+  },
+  async getYouTubeChannelVideos() {
+    throw new Error("YouTube channel browsing is available in the installed Android app.");
+  },
+  async getInstalledApps() {
+    return { apps: [] };
+  },
+  async getDeviceHealth() {
+    return webHealthSnapshot();
+  },
+  async getDnsFilterStatus() {
+    return {
+      filterPackage: "dnsfilter.android" as const,
+      versionName: "1.50.60.8",
+      installed: true,
+      enabled: true,
+      vpnActive: webDnsFilterAlwaysOn,
+      filterActive: webDnsFilterAlwaysOn,
+      alwaysOn: webDnsFilterAlwaysOn,
+      lockdown: false,
+      privateDnsMode: "off" as const,
+      privateDnsHost: null,
+      privateDnsMayBypassFilter: false,
+      canManageAlwaysOn: true,
+      arborXrManaged: false,
+    };
+  },
+  async setDnsFilterAlwaysOn({ enabled }) {
+    webDnsFilterAlwaysOn = enabled;
+    return this.getDnsFilterStatus();
+  },
+  async openDnsFilter() {},
+  async openVpnSettings() {},
+  async openPrivateDnsSettings() {},
+  async getDebloatApps() {
+    return { profile: "lenovo", apps: webDebloatApps };
+  },
+  async applyRecommendedDebloat({ manageNotifications }) {
+    webManageNotifications = manageNotifications;
+    let changed = 0;
+    webDebloatApps = webDebloatApps.map((app) => {
+      if (app.hidden || app.status === "disabled-externally") return app;
+      changed++;
+      return { ...app, hidden: true, managedByOpenPanel: true, status: "hidden" as const };
+    });
+    return webActionResult("Recommended apps were hidden reversibly.", changed);
+  },
+  async setDebloatPackageState({ packageName, hidden }) {
+    let changed = 0;
+    webDebloatApps = webDebloatApps.map((app) => {
+      if (app.packageName !== packageName || app.status === "disabled-externally") return app;
+      changed++;
+      return {
+        ...app,
+        hidden,
+        managedByOpenPanel: hidden,
+        status: hidden ? "hidden" as const : "active" as const,
+      };
+    });
+    return webActionResult(hidden ? "App hidden." : "App restored.", changed);
+  },
+  async restoreDebloatApps() {
+    let restored = 0;
+    webDebloatApps = webDebloatApps.map((app) => {
+      if (!app.managedByOpenPanel) return app;
+      restored++;
+      return { ...app, hidden: false, managedByOpenPanel: false, status: "active" as const };
+    });
+    return { ...webActionResult("Apps hidden by OpenPanel were restored.", restored), restored };
+  },
+  async setNotificationManagement({ enabled }) {
+    webManageNotifications = enabled;
+    return {
+      ...webActionResult(enabled
+        ? "Notifications were disabled for eligible apps."
+        : "Notification grants changed by OpenPanel were restored."),
+      enabled,
+    };
+  },
+  async requestUninstallPackage({ packageName }) {
+    webDebloatApps = webDebloatApps.filter((app) => app.packageName !== packageName);
+    return { packageName, uninstalled: true, resultCode: -1 };
   },
   async launchApp() {},
   async getBatteryInfo() {
@@ -98,6 +559,10 @@ const webMock: SystemBridgePlugin = {
   async getWifiStatus() {
     return { enabled: true, connected: true, ssid: "Dev Network", signal: 90 };
   },
+  async getUsageClock() {
+    return { wall: Date.now(), monotonic: performance.now(), foregroundSince: 0, boot: 0, interactive: true, locked: false };
+  },
+  async setTimeGuard() {},
   async scanWifi() {
     return {
       networks: [
@@ -129,8 +594,30 @@ const webMock: SystemBridgePlugin = {
     return { status: "unpaired" };
   },
   async openBluetoothSettings() {},
+  async openSystemSettings() {},
+  async getVolumeLimit() { return { enabled: false, percent: 25 }; },
+  async setVolumeLimit(opts) { return { enabled: opts.enabled ?? false, percent: opts.percent ?? 25 }; },
+  async testVolumeLimit() {},
+  async getNotificationSounds() { return { sounds: [], selected: null, canWrite: false }; },
+  async previewNotificationSound() {},
+  async setNotificationSound() {},
+  async setKioskAdminVerifier() {},
   async getKioskStatus() {
-    return { deviceOwner: false, deviceAdmin: false, arborXrManaged: false, defaultLauncher: false, lockTaskActive: false, lockTaskMode: "none" as const };
+    return {
+      deviceOwner: false,
+      deviceAdmin: false,
+      arborXrManaged: false,
+      defaultLauncher: false,
+      homeControlMode: "other" as const,
+      lockTaskActive: false,
+      lockTaskMode: "none" as const,
+      managementMode: "companion" as const,
+      kioskEnabled: false,
+      systemUpdateWaitingSince: null,
+    };
+  },
+  async setManagementMode({ mode }) {
+    return { mode };
   },
   async requestDeviceAdmin() {
     return { status: "mock" };
@@ -140,6 +627,37 @@ const webMock: SystemBridgePlugin = {
     return { status: "pinned" };
   },
   async disableKioskLock() {},
+  async exitKioskToSystemHome() {
+    return { exited: true, launcherPackage: null, deviceOwnerRetained: false };
+  },
+  async clearDeviceOwner() { return { cleared: true }; },
+  async getPermissionStatus() {
+    return {
+      deviceOwner: false,
+      deviceAdmin: false,
+      defaultLauncher: false,
+      homeControlMode: "other" as const,
+      location: true,
+      bluetooth: true,
+      accessibility: false,
+      notificationAccess: false,
+      overlay: false,
+      usageAccess: false,
+      writeSettings: false,
+      batteryUnrestricted: false,
+      keyguardDisabled: false,
+    };
+  },
+  async autoGrantSelfPermissions() { return { deviceOwner: false, granted: 0 }; },
+  async setKeyguardDisabled(opts: { disabled: boolean }) {
+    return { disabled: opts.disabled, applied: opts.disabled };
+  },
+  async openAccessibilitySettings() {},
+  async openNotificationListenerSettings() {},
+  async openOverlaySettings() {},
+  async openUsageAccessSettings() {},
+  async openWriteSettings() {},
+  async requestIgnoreBatteryOptimizations() { return { granted: false }; },
   async addListener() {
     return { remove: async () => {} } as PluginListenerHandle;
   },

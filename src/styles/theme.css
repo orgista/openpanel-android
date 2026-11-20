@@ -128,6 +128,13 @@
     @apply bg-background text-foreground;
   }
 
+  /* Tablets: every button and tab is at least a 44px tap target. Base layer,
+     so a component's own min-h-/min-w- utilities still win. */
+  [data-input-mode="touch"] :is(button, [role="tab"]):not([role="switch"]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
   /**
   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
   * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.

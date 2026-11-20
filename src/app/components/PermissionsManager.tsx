@@ -1,0 +1,79 @@
+import {
+  Check,
+  Loader2,
+  Lock,
+} from "lucide-react";
+import { SystemBridge } from "../native/SystemBridge";
+import { getAdminToken } from "../native/adminAuth";
+import { usePermissionRows } from "./usePermissionRows";
+
+const rowClass = "flex items-center justify-between gap-4 p-4 bg-[oklch(26.9%_0_0)] rounded-lg";
+const grantBtn =
+  "shrink-0 px-4 py-2 bg-[oklch(48.8%_0.243_264.376)] text-[oklch(98.5%_0_0)] rounded-lg hover:bg-[oklch(48.8%_0.243_264.376)]/80 transition-colors text-sm";
+
+// Ongoing management of the Fully-style grants, reachable from the Admin panel.
+// A device owner auto-grants its runtime permissions and can hide the lock
+// screen; the special-access rows deep-link the matching Settings screen.
+// Fully managed provisioning lives in the repository documentation because a
+// QR displayed by the target tablet disappears when that tablet is reset.
+// Rows + the auto-grant/visibility-refresh lifecycle are shared with the
+// standalone onboarding wizard via usePermissionRows().
+export function PermissionsManager({ touch = false, arborXrManaged = false }: { touch?: boolean; arborXrManaged?: boolean }) {
+  const { status, rows, isDeviceOwner: isDO, act } = usePermissionRows();
+  const s = status;
+
+  if (s === null) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-[oklch(70.8%_0_0)]">
+        <Loader2 className="w-5 h-5 animate-spin" /> Checking permissions…
+      </div>
+    );
+  }
+
+  return (
+    <div className="system-list space-y-3">
+      {rows.map((row) => {
+        const Icon = row.icon;
+        return (
+          <div key={row.key} className={`system-list-row ${rowClass}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              {row.granted
+                ? <Check className="w-5 h-5 text-[oklch(72%_0.19_142)] shrink-0" />
+                : <Icon className="w-5 h-5 text-[oklch(70.8%_0_0)] shrink-0" />}
+              <div className="min-w-0">
+                <div className="text-[oklch(98.5%_0_0)] text-sm" style={{ fontWeight: 500 }}>{row.label}</div>
+                {!touch && <div className="text-[oklch(55.6%_0_0)] text-xs" style={{ fontWeight: 400 }}>{row.detail}</div>}
+              </div>
+            </div>
+            {touch && arborXrManaged ? <span className="text-sm">{row.granted ? "Granted" : "Managed by ArborXR"}</span> : row.granted ? (
+              <span className="shrink-0 text-[oklch(72%_0.19_142)] text-sm" style={{ fontWeight: 500 }}>Granted</span>
+            ) : (
+              <button type="button" onClick={() => void act(row.action)} className={grantBtn}>Grant</button>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Only a device owner can suppress the swipe lock screen. */}
+      {isDO && !(touch && arborXrManaged) && (
+        <div className={`system-list-row ${rowClass}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <Lock className="w-5 h-5 text-[oklch(70.8%_0_0)] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[oklch(98.5%_0_0)] text-sm" style={{ fontWeight: 500 }}>Hide lock screen</div>
+              {!touch && <div className="text-[oklch(55.6%_0_0)] text-xs" style={{ fontWeight: 400 }}>Wake straight into OpenPanel, skipping the swipe lock screen.</div>}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void act(() => SystemBridge.setKeyguardDisabled({ disabled: !s.keyguardDisabled, adminToken: getAdminToken() ?? undefined }))}
+            className={grantBtn}
+            aria-pressed={s.keyguardDisabled}
+          >
+            {s.keyguardDisabled ? "On" : "Off"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

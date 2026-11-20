@@ -9,8 +9,24 @@
 // is for. App backup is disabled (see AndroidManifest) so this record does not
 // leave the device.
 
+import { SystemBridge } from "./SystemBridge";
+
 const KEY = "openpanel.admin.v1";
 const THROTTLE_KEY = "openpanel.admin.throttle.v1";
+
+// Mirror the current PIN verifier into native SharedPreferences so the
+// kiosk-dismantling bridge methods (SystemBridgePlugin.requireKioskAdmin) can
+// gate on it. Native never sees the raw PIN, only this salted hash — the same
+// value already stored here. Best-effort: a native mirror failure (e.g. web
+// preview, plugin unavailable) must not block PIN setup/reset itself, so the
+// gate simply stays unprovisioned (fails open) until the next successful sync.
+async function syncAdminVerifierToNative(verifier: string): Promise<void> {
+  try {
+    await SystemBridge.setKioskAdminVerifier({ verifier });
+  } catch {
+    /* best-effort mirror; see comment above */
+  }
+}
 
 // PBKDF2 work factor. Four-digit PINs have a tiny keyspace, so the slow KDF is
 // the offline backstop and the throttle below is the online one.
@@ -158,20 +174,45 @@ export function isAdminConfigured(): boolean {
   return read() !== null;
 }
 
+/**
+ * The current admin verifier (salted PBKDF2 hash of the PIN), or null if no
+ * PIN is configured. This is the same value mirrored into native prefs via
+ * setKioskAdminVerifier(); pass it as `adminToken` on any SystemBridge call
+ * gated by SystemBridgePlugin.requireKioskAdmin() (enableKioskLock,
+ * disableKioskLock, exitKioskToSystemHome, clearDeviceOwner, setManagementMode,
+ * openLauncherSettings, setKeyguardDisabled, setDnsFilterAlwaysOn, the debloat
+ * mutators). Never the raw PIN — see the file header.
+ */
+export function getAdminToken(): string | null {
+  return read()?.pinHash ?? null;
+}
+
+/**
+ * Remove the local Admin credential and its lockout state. This intentionally
+ * leaves app visibility, videos, and device settings untouched.
+ */
+export function clearAdminConfiguration(): void {
+  localStorage.removeItem(KEY);
+  localStorage.removeItem(THROTTLE_KEY);
+  void syncAdminVerifierToNative("");
+}
+
 export function getSecurityQuestion(): string | null {
   return read()?.question ?? null;
 }
 
 export async function setupAdmin(pin: string, question: string, answer: string): Promise<void> {
   const salt = randomSaltHex();
+  const pinHash = await deriveHash(pin, salt);
   const record: AdminRecord = {
     salt,
-    pinHash: await deriveHash(pin, salt),
+    pinHash,
     question,
     answerHash: await deriveHash(normalizeAnswer(answer), salt),
   };
   write(record);
   recordSuccess();
+  await syncAdminVerifierToNative(pinHash);
 }
 
 // Verifies `value` against `stored`, transparently handling legacy (unsalted)
@@ -195,7 +236,9 @@ export async function verifyPin(pin: string): Promise<boolean> {
     // Upgrade legacy PIN verifier in place.
     if (!rec.salt) {
       const salt = randomSaltHex();
-      write({ ...rec, salt, pinHash: await deriveHash(pin, salt) });
+      const pinHash = await deriveHash(pin, salt);
+      write({ ...rec, salt, pinHash });
+      await syncAdminVerifierToNative(pinHash);
     }
   } else {
     recordFailure();
@@ -207,17 +250,35 @@ export async function verifySecurityAnswer(answer: string): Promise<boolean> {
   if (isLockedOut()) return false;
   const rec = read();
   if (!rec) return false;
+  const normalized = normalizeAnswer(answer);
   // A salted record hashes both fields with the same salt; a legacy record (or a
   // PIN-only upgrade) still has an unsalted answer hash, so fall back to sha256.
   let ok: boolean;
+  let legacyAnswerMatch = false;
   if (rec.salt) {
-    ok = safeEqual(rec.answerHash, await deriveHash(normalizeAnswer(answer), rec.salt));
-    if (!ok) ok = safeEqual(rec.answerHash, await sha256(normalizeAnswer(answer))); // pre-upgrade answer
+    ok = safeEqual(rec.answerHash, await deriveHash(normalized, rec.salt));
+    if (!ok) {
+      ok = safeEqual(rec.answerHash, await sha256(normalized)); // pre-upgrade answer
+      legacyAnswerMatch = ok;
+    }
   } else {
-    ok = safeEqual(rec.answerHash, await sha256(normalizeAnswer(answer)));
+    // No salt on the record means pinHash is still legacy too, so we can't add a
+    // salt here without breaking PIN verification (matches() keys off salt
+    // presence). The answer migrates once resetPin salts the record; from then
+    // on the salted branch above upgrades it.
+    ok = safeEqual(rec.answerHash, await sha256(normalized));
   }
-  if (ok) recordSuccess();
-  else recordFailure();
+  if (ok) {
+    recordSuccess();
+    // Upgrade a legacy (unsalted SHA-256) answer verifier to salted PBKDF2 in
+    // place, mirroring verifyPin, so a stored copy can't be reversed with a fast
+    // hash sweep.
+    if (legacyAnswerMatch && rec.salt) {
+      write({ ...rec, answerHash: await deriveHash(normalized, rec.salt) });
+    }
+  } else {
+    recordFailure();
+  }
   return ok;
 }
 
@@ -225,6 +286,8 @@ export async function resetPin(newPin: string): Promise<void> {
   const rec = read();
   if (!rec) return;
   const salt = rec.salt ?? randomSaltHex();
-  write({ ...rec, salt, pinHash: await deriveHash(newPin, salt) });
+  const pinHash = await deriveHash(newPin, salt);
+  write({ ...rec, salt, pinHash });
   recordSuccess();
+  await syncAdminVerifierToNative(pinHash);
 }
