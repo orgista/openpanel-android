@@ -64,7 +64,8 @@ function youtubeUrl(input: string): URL | null {
   }
 }
 
-function cleanThumbnailUrl(value: string | null | undefined): string {
+/** Stored channel art: inline image data or https art from YouTube's channel image hosts, else empty. */
+export function cleanThumbnailUrl(value: string | null | undefined): string {
   if (!value) return "";
   // Natively fetched art stored inline: immune to URL rot and Wi-Fi races.
   if (/^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 700_000) {

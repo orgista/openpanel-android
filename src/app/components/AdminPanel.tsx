@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { X, Plus, Trash2, Youtube, Lock, Unlock, Smartphone, Monitor, Check, AlertTriangle, RefreshCw, HeartPulse, Library, LayoutGrid, Mic, Volume2 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { type KioskYouTubeItem, thumbnailUrl } from "../native/youtube";
+import { type KioskYouTubeItem, cleanThumbnailUrl, thumbnailUrl } from "../native/youtube";
 import { SystemBridge, type DeviceProfile, type KioskStatus } from "../native/SystemBridge";
 import type { AppMode } from "../appConfig";
 import { YouTubeSearchPanel } from "./YouTubeSearchPanel";
@@ -769,7 +769,7 @@ export function AdminPanel({
                       >
                         {v.kind === "video" || v.thumbnailUrl ? (
                           <img
-                            src={v.kind === "video" ? thumbnailUrl(v.sourceId) : v.thumbnailUrl}
+                            src={v.kind === "video" ? thumbnailUrl(v.sourceId) : cleanThumbnailUrl(v.thumbnailUrl)}
                             alt=""
                             loading="lazy"
                             className={`youtube-channel-art shrink-0 object-cover bg-[oklch(20.5%_0_0)] ${v.kind === "channel" ? "size-16 rounded-full" : "h-16 w-28 rounded-lg"}`}
